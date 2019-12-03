@@ -71,7 +71,9 @@ func main() {
 		status := bgLoop()
 		stdlog.Println(status)
 	default:
-		if msg, err := ipc.SendCmd(args[1]); err == nil {
+		var aCmd ipc.IpcCmd
+		aCmd.Cmd = args[1]
+		if msg, err := ipc.SendCmd(aCmd); err == nil {
 			fmt.Printf("%s\n", msg)
 		}
 	}
@@ -99,9 +101,9 @@ func bgLoop() string {
 	}
 }
 
-func ipcCmd(client *ipc.Client) {
-	stdlog.Println(string(client.Msg))
-	switch string(client.Msg) {
+func ipcCmd(client *ipc.Client) (err error) {
+	stdlog.Println(string(client.Msg.Cmd))
+	switch string(client.Msg.Cmd) {
 	case "stop":
 		if status, err := service.Stop(); err != nil {
 			errlog.Println(status, "\nError: ", err)
@@ -110,6 +112,8 @@ func ipcCmd(client *ipc.Client) {
 	case "version":
 		client.Ws.WriteJSON("{'Version':" + verNo + "}")
 	default:
-		client.Ws.WriteJSON("{'echo':'" + string(client.Msg) + "'}")
+		client.Ws.WriteJSON("{'echo':'" + string(client.Msg.Cmd) + "'}")
 	}
+
+	return
 }

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -59,6 +60,30 @@ var (
 	wsRoute        = "/ipc"
 	wsServer       = "ws://127.0.0.1"
 )
+
+func SetWsPort(p int) {
+	wsPort = ":" + strconv.Itoa(p)
+}
+
+func SetWsRoute(s string) {
+	wsRoute = s
+}
+
+func SetWsServer(s string) {
+	wsServer = s
+}
+
+func GetWsPort() string {
+	return wsPort
+}
+
+func GetWsRoute() string {
+	return wsRoute
+}
+
+func GetWsServer() string {
+	return wsServer
+}
 
 func NewIpc(aCmd func(client *Client) (err error), s *log.Logger, e *log.Logger) (i *IPC) {
 

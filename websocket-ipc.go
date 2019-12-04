@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -33,14 +34,19 @@ func (c IpcCmd) Serialize() (serialString string) {
 	return
 }
 
-type IpcMsg struct {
-	UnixTime     int64       `json:"unix_time,string"`
-	Result       bool        `json:"result,string"`
-	Message      string      `json:"msg"`
-	ResultObject interface{} `json:"result_object,string"`
+type IpcResult struct {
+	ReqCmd IpcCmd
+	Rsp    IpcRsp
 }
 
-func (c IpcMsg) Serialize() (serialString string) {
+type IpcRsp struct {
+	UnixTime   int64  `json:"unix_time,string"`
+	Result     string `json:"result"`
+	Message    string `json:"msg"`
+	ResultJSON string `json:"result_json"`
+}
+
+func (c IpcRsp) Serialize() (serialString string) {
 	var bytes []byte
 	bytes, _ = json.Marshal(c)
 	serialString = string(bytes)
@@ -76,10 +82,19 @@ func NewIpc(aCmd func(client *Client) (err error), s *log.Logger, e *log.Logger)
 	return
 }
 
+// ACmd : an example Cmd process function
 func (i *IPC) ACmd(client *Client) (err error) {
+
+	var nowT = time.Now()
 	switch string(client.Msg.Cmd) {
 	default:
-		client.Ws.WriteJSON("{'echo':'" + string(client.Msg.Cmd) + "'}")
+		retMsg := IpcRsp{
+			UnixTime:   nowT.Add(time.Since(nowT)).UnixNano(),
+			Result:     "true",
+			Message:    "client.Msg.Cmd",
+			ResultJSON: "",
+		}
+		client.Ws.WriteMessage(websocket.TextMessage, []byte(retMsg.Serialize()))
 	}
 
 	return
@@ -89,48 +104,47 @@ func (i *IPC) WsHandel() {
 	upgrader := websocket.Upgrader{}
 
 	http.HandleFunc(wsRoute, func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			errlog.Println(err)
-			return
-		}
-
-		defer conn.Close()
-		stdlog.Println("ws connected !!")
-		for {
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				errlog.Println(err)
-				break
+		if conn, err := upgrader.Upgrade(w, r, nil); err == nil {
+			defer conn.Close()
+			stdlog.Println("ws connected !!")
+			for {
+				if _, msgCmd, err := conn.ReadMessage(); err == nil {
+					var aCmd IpcCmd
+					err = json.Unmarshal([]byte(msgCmd), &aCmd)
+					client := &Client{Ws: conn, Msg: aCmd}
+					i.WsClient <- client
+				} else {
+					errlog.Println("read", err)
+					break
+				}
 			}
-
-			var aCmd IpcCmd
-			err = json.Unmarshal([]byte(msg), &aCmd)
-			client := &Client{Ws: conn, Msg: aCmd}
-			i.WsClient <- client
+		} else {
+			errlog.Println("conn", err)
 		}
 	})
 
 	http.ListenAndServe(wsPort, nil)
 }
 
-func SendCmd(aCmd IpcCmd) (string, error) {
-	c, _, err := websocket.DefaultDialer.Dial(wsServer+wsPort+wsRoute, nil)
-	if err != nil {
-		errlog.Fatal("dial:", err)
-	}
-	defer c.Close()
+func SendCmd(aCmd IpcCmd) (res *IpcResult, err error) {
+	var (
+		rsp []byte
+		c   *websocket.Conn
+	)
 
-	err = c.WriteMessage(websocket.TextMessage, []byte(aCmd.Serialize()))
-	if err != nil {
-		errlog.Println(err)
-		return "", err
+	if c, _, err = websocket.DefaultDialer.Dial(wsServer+wsPort+wsRoute, nil); err == nil {
+		defer c.Close()
+		if err = c.WriteMessage(websocket.TextMessage, []byte(aCmd.Serialize())); err == nil {
+			if _, rsp, err = c.ReadMessage(); err == nil {
+				var aMsg IpcRsp
+				err = json.Unmarshal([]byte(rsp), &aMsg)
+				res = &IpcResult{
+					ReqCmd: aCmd,
+					Rsp:    aMsg,
+				}
+			}
+		}
 	}
 
-	_, msg, err := c.ReadMessage()
-	if err != nil {
-		errlog.Println(err)
-		return "", err
-	}
-	return string(msg), nil
+	return
 }

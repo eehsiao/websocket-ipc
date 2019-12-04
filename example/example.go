@@ -8,8 +8,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	ipc "github.com/eehsiao/websocket-ipc"
+	"github.com/gorilla/websocket"
 	"github.com/takama/daemon"
 )
 
@@ -73,8 +75,11 @@ func main() {
 	default:
 		var aCmd ipc.IpcCmd
 		aCmd.Cmd = args[1]
+		aCmd.CmdFlag = "test"
 		if msg, err := ipc.SendCmd(aCmd); err == nil {
-			fmt.Printf("%s\n", msg)
+			fmt.Printf("%v\n%s => %s\n", msg, msg.ReqCmd.Cmd, msg.Rsp.Message)
+		} else {
+			fmt.Println(err)
 		}
 	}
 }
@@ -103,16 +108,30 @@ func bgLoop() string {
 
 func ipcCmd(client *ipc.Client) (err error) {
 	stdlog.Println(string(client.Msg.Cmd))
+
+	var nowT = time.Now()
+	retMsg := ipc.IpcRsp{
+		UnixTime:   nowT.Add(time.Since(nowT)).UnixNano(),
+		Result:     "true",
+		Message:    client.Msg.Cmd,
+		ResultJSON: "",
+	}
+
 	switch string(client.Msg.Cmd) {
 	case "stop":
 		if status, err := service.Stop(); err != nil {
 			errlog.Println(status, "\nError: ", err)
 		}
+		stdlog.Println(retMsg.Serialize())
+		client.Ws.WriteMessage(websocket.TextMessage, []byte(retMsg.Serialize()))
 		os.Exit(1)
 	case "version":
-		client.Ws.WriteJSON("{'Version':" + verNo + "}")
+		retMsg.Message = verNo
+		stdlog.Println(retMsg.Serialize())
+		client.Ws.WriteMessage(websocket.TextMessage, []byte(retMsg.Serialize()))
 	default:
-		client.Ws.WriteJSON("{'echo':'" + string(client.Msg.Cmd) + "'}")
+		stdlog.Println(retMsg.Serialize())
+		client.Ws.WriteMessage(websocket.TextMessage, []byte(retMsg.Serialize()))
 	}
 
 	return

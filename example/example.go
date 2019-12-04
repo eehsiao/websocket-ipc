@@ -111,10 +111,9 @@ func ipcCmd(client *ipc.Client) (err error) {
 
 	var nowT = time.Now()
 	retMsg := ipc.IpcRsp{
-		UnixTime:   nowT.Add(time.Since(nowT)).UnixNano(),
-		Result:     "true",
-		Message:    client.Msg.Cmd,
-		ResultJSON: "",
+		UnixTime: nowT.Add(time.Since(nowT)).UnixNano(),
+		Result:   true,
+		Message:  client.Msg.Cmd,
 	}
 
 	switch string(client.Msg.Cmd) {

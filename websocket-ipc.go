@@ -40,10 +40,9 @@ type IpcResult struct {
 }
 
 type IpcRsp struct {
-	UnixTime   int64  `json:"unix_time,string"`
-	Result     string `json:"result"`
-	Message    string `json:"msg"`
-	ResultJSON string `json:"result_json"`
+	UnixTime int64  `json:"unix_time,string"`
+	Result   bool   `json:"result,string"`
+	Message  string `json:"msg"`
 }
 
 func (c IpcRsp) Serialize() (serialString string) {
@@ -89,10 +88,9 @@ func (i *IPC) ACmd(client *Client) (err error) {
 	switch string(client.Msg.Cmd) {
 	default:
 		retMsg := IpcRsp{
-			UnixTime:   nowT.Add(time.Since(nowT)).UnixNano(),
-			Result:     "true",
-			Message:    "client.Msg.Cmd",
-			ResultJSON: "",
+			UnixTime: nowT.Add(time.Since(nowT)).UnixNano(),
+			Result:   true,
+			Message:  "client.Msg.Cmd",
 		}
 		client.Ws.WriteMessage(websocket.TextMessage, []byte(retMsg.Serialize()))
 	}

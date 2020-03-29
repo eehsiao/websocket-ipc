@@ -129,7 +129,7 @@ func (i *IPC) WsHandel() {
 	http.HandleFunc(wsRoute, func(w http.ResponseWriter, r *http.Request) {
 		if conn, err := upgrader.Upgrade(w, r, nil); err == nil {
 			defer conn.Close()
-			stdlog.Println("ws connected !!")
+			// stdlog.Println("ipc connected !!")
 			for {
 				if _, msgCmd, err := conn.ReadMessage(); err == nil {
 					var aCmd IpcCmd
@@ -137,12 +137,12 @@ func (i *IPC) WsHandel() {
 					client := &Client{Ws: conn, Msg: aCmd}
 					i.WsClient <- client
 				} else {
-					errlog.Println("read", err)
+					errlog.Println("ipc read error", err)
 					break
 				}
 			}
 		} else {
-			errlog.Println("conn", err)
+			errlog.Println("ipc conn error", err)
 		}
 	})
 
